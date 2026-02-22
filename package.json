@@ -1,0 +1,17 @@
+{
+  "name": "omniparse-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm -w packages/sdk run build",
+    "test": "npm -w packages/sdk run test",
+    "dev": "npm -w packages/sdk run dev",
+    "clean": "npm -w packages/sdk run clean",
+    "typecheck": "npm -w packages/sdk run typecheck"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

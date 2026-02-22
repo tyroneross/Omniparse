@@ -1,0 +1,76 @@
+{
+  "name": "@tyroneross/omniparse",
+  "version": "1.0.0",
+  "description": "Universal document parser. Parse Excel, PowerPoint, Python, PDF, and directories into clean, LLM-ready Markdown and structured data.",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./parsers": {
+      "types": "./dist/parsers/index.d.ts",
+      "import": "./dist/parsers/index.mjs",
+      "require": "./dist/parsers/index.js"
+    }
+  },
+  "bin": {
+    "omniparse": "./dist/bin/omniparse.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "tsx tests/run-tests.ts",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "document-parser",
+    "excel-parser",
+    "pptx-parser",
+    "python-parser",
+    "pdf-parser",
+    "markdown",
+    "llm",
+    "ai",
+    "omniparse",
+    "file-parser",
+    "content-extraction"
+  ],
+  "author": "Tyrone Ross",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tyroneross/Omniparse.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/tyroneross/Omniparse#readme",
+  "bugs": {
+    "url": "https://github.com/tyroneross/Omniparse/issues"
+  },
+  "dependencies": {
+    "p-limit": "^6.2.0",
+    "sax": "^1.4.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/sax": "^1.2.7",
+    "tsup": "^8.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
