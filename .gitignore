@@ -6,3 +6,15 @@ dist/
 .env
 .env.*
 coverage/
+.next/
+out/
+
+# SQLite database
+*.db
+*.db-journal
+
+# Generated Prisma client
+generated/
+
+# Bookmark snapshot data
+.claude/bookmarks/

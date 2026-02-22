@@ -1,0 +1,41 @@
+datasource db {
+  provider = "sqlite"
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma/client"
+}
+
+model Project {
+  id          String     @id @default(cuid())
+  name        String
+  description String     @default("")
+  color       String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  documents   Document[]
+}
+
+model Document {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fileName        String
+  fileType        String
+  fileSize        Int
+  parsedAt        DateTime @default(now())
+  parseTime       Float    @default(0)
+  wordCount       Int      @default(0)
+  estimatedTokens Int      @default(0)
+  markdown        String   @default("")
+  text            String   @default("")
+  sheetCount      Int?
+  totalRows       Int?
+  slideCount      Int?
+  pageCount       Int?
+  functions       Int?
+  classes         Int?
+  rawResult       String   @default("{}")
+  sheets          String?
+}

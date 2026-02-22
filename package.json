@@ -6,10 +6,14 @@
   ],
   "scripts": {
     "build": "npm -w packages/sdk run build",
+    "build:web": "npm -w packages/sdk run build && npm -w packages/web run build",
+    "dev": "npm -w packages/sdk run build && npm -w packages/web run dev",
+    "dev:sdk": "npm -w packages/sdk run dev",
     "test": "npm -w packages/sdk run test",
-    "dev": "npm -w packages/sdk run dev",
     "clean": "npm -w packages/sdk run clean",
-    "typecheck": "npm -w packages/sdk run typecheck"
+    "typecheck": "npm -w packages/sdk run typecheck",
+    "db:generate": "npm -w packages/web exec prisma generate",
+    "db:push": "npm -w packages/web exec prisma db push"
   },
   "engines": {
     "node": ">=18.0.0"
