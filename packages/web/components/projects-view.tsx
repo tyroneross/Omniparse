@@ -52,9 +52,10 @@ export function ProjectsView({
   const [newName, setNewName] = useState("")
   const [newDesc, setNewDesc] = useState("")
   const [creating, setCreating] = useState(false)
-  const [renameTarget, setRenameTarget] = useState<Project | null>(null)
-  const [renameName, setRenameName] = useState("")
-  const [renaming, setRenaming] = useState(false)
+  const [editTarget, setEditTarget] = useState<Project | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editDesc, setEditDesc] = useState("")
+  const [saving, setSaving] = useState(false)
 
   const handleCreate = async () => {
     if (!newName.trim()) return
@@ -82,24 +83,29 @@ export function ProjectsView({
     }
   }
 
-  const handleRename = async () => {
-    if (!renameTarget || !renameName.trim()) return
-    setRenaming(true)
+  const handleSaveEdit = async () => {
+    if (!editTarget || !editName.trim()) return
+    setSaving(true)
     try {
-      await updateProject(renameTarget.id, { name: renameName.trim() })
-      setRenameTarget(null)
-      setRenameName("")
+      const updates: { name?: string; description?: string } = {}
+      if (editName.trim() !== editTarget.name) updates.name = editName.trim()
+      if (editDesc.trim() !== editTarget.description) updates.description = editDesc.trim()
+      if (Object.keys(updates).length > 0) {
+        await updateProject(editTarget.id, updates)
+      }
+      setEditTarget(null)
       onRefresh()
     } catch (err) {
-      console.error('Failed to rename project:', err)
+      console.error('Failed to update project:', err)
     } finally {
-      setRenaming(false)
+      setSaving(false)
     }
   }
 
-  const openRenameDialog = (project: Project) => {
-    setRenameName(project.name)
-    setRenameTarget(project)
+  const openEditDialog = (project: Project) => {
+    setEditName(project.name)
+    setEditDesc(project.description || '')
+    setEditTarget(project)
   }
 
   return (
@@ -193,7 +199,7 @@ export function ProjectsView({
               isActive={project.id === activeProjectId}
               onSelect={() => onSelectProject(project.id)}
               onDelete={() => handleDelete(project.id)}
-              onRename={() => openRenameDialog(project)}
+              onEdit={() => openEditDialog(project)}
             />
           ))}
         </div>
@@ -220,39 +226,53 @@ export function ProjectsView({
         </div>
       )}
 
-      {/* Rename dialog */}
-      <Dialog open={!!renameTarget} onOpenChange={(open) => !open && setRenameTarget(null)}>
+      {/* Edit project dialog */}
+      <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Rename project</DialogTitle>
+            <DialogTitle>Edit project</DialogTitle>
           </DialogHeader>
-          <div className="py-2">
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">
-              Project name
-            </label>
-            <input
-              autoFocus
-              type="text"
-              value={renameName}
-              onChange={(e) => setRenameName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleRename()}
-              className="h-11 w-full rounded-lg border border-border bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
-            />
+          <div className="flex flex-col gap-3 py-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                Project name
+              </label>
+              <input
+                autoFocus
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()}
+                className="h-11 w-full rounded-lg border border-border bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                Description
+              </label>
+              <input
+                type="text"
+                placeholder="Brief summary of project scope"
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                className="h-11 w-full rounded-lg border border-border bg-background px-3 text-base text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/20"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setRenameTarget(null)}
+              onClick={() => setEditTarget(null)}
             >
               Cancel
             </Button>
             <Button
               size="sm"
-              disabled={!renameName.trim() || renameName.trim() === renameTarget?.name || renaming}
-              onClick={handleRename}
+              disabled={!editName.trim() || saving}
+              onClick={handleSaveEdit}
             >
-              {renaming ? 'Saving...' : 'Save'}
+              {saving ? 'Saving...' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -266,13 +286,13 @@ function ProjectCard({
   isActive,
   onSelect,
   onDelete,
-  onRename,
+  onEdit,
 }: {
   project: Project
   isActive: boolean
   onSelect: () => void
   onDelete: () => void
-  onRename: () => void
+  onEdit: () => void
 }) {
   return (
     <button
@@ -317,11 +337,11 @@ function ProjectCard({
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation()
-                onRename()
+                onEdit()
               }}
             >
               <Pencil className="mr-2 h-3.5 w-3.5" />
-              Rename
+              Edit
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

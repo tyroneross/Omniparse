@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   Search,
   Clock,
@@ -12,12 +12,19 @@ import {
   Code,
   Globe,
   FolderOpen,
+  ArrowUpDown,
+  Trash2,
+  Download,
+  CheckSquare,
+  Square,
+  X,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { View, Project, Document } from "@/lib/mock-data"
 import { getTypeColor, getTypeIcon, formatNumber, formatFileSize, timeAgo } from "@/lib/mock-data"
-import { fetchDocuments } from "@/lib/api"
+import { fetchDocuments, deleteDocument } from "@/lib/api"
 
 interface DashboardViewProps {
   onNavigate: (view: View) => void
@@ -35,15 +42,86 @@ export function DashboardView({
   const [searchQuery, setSearchQuery] = useState("")
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(false)
+  const [sortBy, setSortBy] = useState<'date' | 'name' | 'size'>('date')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkMode, setBulkMode] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
-  useEffect(() => {
+  const loadDocuments = () => {
     if (!activeProject) return
     setLoading(true)
     fetchDocuments(activeProject.id)
       .then(setDocuments)
       .catch(console.error)
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    loadDocuments()
   }, [activeProject?.id])
+
+  const sortedDocuments = useMemo(() => {
+    const sorted = [...documents]
+    switch (sortBy) {
+      case 'name':
+        sorted.sort((a, b) => a.fileName.localeCompare(b.fileName))
+        break
+      case 'size':
+        sorted.sort((a, b) => b.fileSize - a.fileSize)
+        break
+      case 'date':
+      default:
+        sorted.sort((a, b) => new Date(b.parsedAt).getTime() - new Date(a.parsedAt).getTime())
+        break
+    }
+    return sorted
+  }, [documents, sortBy])
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === documents.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(documents.map(d => d.id)))
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    setDeleting(true)
+    try {
+      await Promise.all([...selectedIds].map(id => deleteDocument(id)))
+      setSelectedIds(new Set())
+      setBulkMode(false)
+      loadDocuments()
+    } catch (err) {
+      console.error('Bulk delete failed:', err)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const handleBulkExport = () => {
+    const selected = documents.filter(d => selectedIds.has(d.id))
+    const combined = selected.map(d =>
+      `# ${d.fileName}\n\n${d.markdown || d.text || '(no content)'}`
+    ).join('\n\n---\n\n')
+    const blob = new Blob([combined], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${activeProject?.name || 'export'}-selected.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   if (!activeProject) {
     return (
@@ -132,34 +210,134 @@ export function DashboardView({
         ))}
       </section>
 
-      {/* Upload zone */}
-      <section className="mb-8">
+      {/* Upload zone + Export */}
+      <section className="mb-8 flex gap-3">
         <button
           onClick={() => onNavigate("upload")}
-          className="group flex w-full items-center gap-4 rounded-xl border border-dashed border-border bg-card p-5 transition-colors hover:border-primary/40 hover:bg-accent/50"
+          className="group flex flex-1 items-center gap-4 rounded-xl border border-dashed border-border bg-card p-5 transition-colors hover:border-primary/40 hover:bg-accent/50"
         >
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/15">
             <FileUp className="h-5 w-5 text-primary" />
           </div>
           <div className="flex-1 text-left">
             <p className="text-sm font-medium text-foreground">
-              Add documents to this project
+              Add documents
             </p>
             <p className="text-xs text-muted-foreground">
-              Drop files or paste a URL to parse and index
+              Drop files or paste a URL
             </p>
           </div>
           <Upload className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
         </button>
+        {documents.length > 0 && (
+          <button
+            onClick={() => {
+              const combined = documents.map(d =>
+                `# ${d.fileName}\n\n${d.markdown || d.text || '(no content)'}`
+              ).join('\n\n---\n\n')
+              const blob = new Blob([combined], { type: 'text/markdown' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `${activeProject?.name || 'export'}-all.md`
+              a.click()
+              URL.revokeObjectURL(url)
+            }}
+            className="group flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card px-6 transition-colors hover:border-primary/40 hover:bg-accent/50"
+          >
+            <Download className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" />
+            <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground">
+              Export all
+            </span>
+          </button>
+        )}
       </section>
 
       {/* Documents in this project */}
       <section>
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-foreground">
             Documents ({documents.length})
           </h2>
+          {documents.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              {/* Sort control */}
+              <div className="flex h-8 items-center rounded-md border border-border text-xs">
+                {(['date', 'name', 'size'] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setSortBy(s)}
+                    className={cn(
+                      "h-full px-2.5 capitalize transition-colors first:rounded-l-md last:rounded-r-md",
+                      sortBy === s
+                        ? "bg-accent text-accent-foreground font-medium"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+              {/* Bulk select toggle */}
+              <button
+                onClick={() => {
+                  setBulkMode(!bulkMode)
+                  setSelectedIds(new Set())
+                }}
+                className={cn(
+                  "flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors",
+                  bulkMode
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <CheckSquare className="h-3.5 w-3.5" />
+                <span className="hidden md:inline">Select</span>
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Bulk action bar */}
+        {bulkMode && selectedIds.size > 0 && (
+          <div className="mb-3 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 p-2.5">
+            <button
+              onClick={toggleSelectAll}
+              className="flex h-7 items-center gap-1.5 rounded px-2 text-xs font-medium text-foreground hover:bg-accent"
+            >
+              {selectedIds.size === documents.length ? (
+                <CheckSquare className="h-3.5 w-3.5 text-primary" />
+              ) : (
+                <Square className="h-3.5 w-3.5" />
+              )}
+              {selectedIds.size === documents.length ? 'Deselect all' : 'Select all'}
+            </button>
+            <span className="text-xs text-muted-foreground">
+              {selectedIds.size} selected
+            </span>
+            <div className="ml-auto flex gap-1.5">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1.5 text-xs"
+                onClick={handleBulkExport}
+              >
+                <Download className="h-3 w-3" />
+                Export
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive"
+                onClick={handleBulkDelete}
+                disabled={deleting}
+              >
+                <Trash2 className="h-3 w-3" />
+                {deleting ? 'Deleting...' : 'Delete'}
+              </Button>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex flex-col gap-2">
@@ -179,16 +357,31 @@ export function DashboardView({
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {documents.map((doc) => {
+            {sortedDocuments.map((doc) => {
               const Icon = getTypeIcon(doc.fileType)
               const colorClass = getTypeColor(doc.fileType)
+              const isSelected = selectedIds.has(doc.id)
 
               return (
                 <button
                   key={doc.id}
-                  onClick={() => onSelectDocument(doc.id)}
-                  className="group flex items-center gap-3 rounded-xl border border-border bg-card p-3.5 text-left transition-colors hover:border-primary/30 hover:bg-accent/30 md:p-4"
+                  onClick={() => bulkMode ? toggleSelect(doc.id) : onSelectDocument(doc.id)}
+                  className={cn(
+                    "group flex items-center gap-3 rounded-xl border bg-card p-3.5 text-left transition-colors md:p-4",
+                    isSelected
+                      ? "border-primary/40 bg-primary/5"
+                      : "border-border hover:border-primary/30 hover:bg-accent/30"
+                  )}
                 >
+                  {bulkMode && (
+                    <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+                      {isSelected ? (
+                        <CheckSquare className="h-4 w-4 text-primary" />
+                      ) : (
+                        <Square className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                  )}
                   <div
                     className={cn(
                       "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",

@@ -50,6 +50,16 @@ export function DocumentView({ documentId, onNavigate, activeProject, onGoToProj
     setTimeout(() => setCopiedField(null), 2000)
   }
 
+  const handleDownload = (content: string, filename: string, mimeType: string) => {
+    const blob = new Blob([content], { type: mimeType })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (loading) {
     return (
       <div className="mx-auto flex max-w-5xl items-center justify-center px-4 py-20">
@@ -152,6 +162,18 @@ export function DocumentView({ documentId, onNavigate, activeProject, onGoToProj
               )}
               <span className="hidden md:inline">{copiedField === "all" ? "Copied" : "Copy All"}</span>
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5"
+              onClick={() => {
+                const baseName = doc.fileName.replace(/\.[^.]+$/, '')
+                handleDownload(doc.markdown || doc.text, `${baseName}.md`, 'text/markdown')
+              }}
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">Download</span>
+            </Button>
           </div>
         </div>
       </div>
@@ -247,22 +269,30 @@ export function DocumentView({ documentId, onNavigate, activeProject, onGoToProj
         {/* Markdown view */}
         <TabsContent value="markdown" className="mt-0">
           <div className="relative">
-            <button
-              onClick={() => handleCopy(doc.markdown, "markdown")}
-              className="absolute right-3 top-3 flex h-8 items-center gap-1.5 rounded-md bg-muted px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            >
-              {copiedField === "markdown" ? (
-                <>
-                  <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5" />
-                  Copy
-                </>
-              )}
-            </button>
+            <div className="absolute right-3 top-3 flex gap-1.5">
+              <button
+                onClick={() => handleCopy(doc.markdown, "markdown")}
+                className="flex h-8 items-center gap-1.5 rounded-md bg-muted px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                {copiedField === "markdown" ? (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" />
+                    Copy
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => handleDownload(doc.markdown, `${doc.fileName.replace(/\.[^.]+$/, '')}.md`, 'text/markdown')}
+                className="flex h-8 items-center gap-1.5 rounded-md bg-muted px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </button>
+            </div>
             <pre className="overflow-x-auto rounded-lg border border-border bg-card p-4 font-mono text-xs leading-relaxed text-foreground md:text-sm">
               {doc.markdown || 'No markdown content available'}
             </pre>
@@ -272,22 +302,30 @@ export function DocumentView({ documentId, onNavigate, activeProject, onGoToProj
         {/* Plain text view */}
         <TabsContent value="text" className="mt-0">
           <div className="relative">
-            <button
-              onClick={() => handleCopy(doc.text, "text")}
-              className="absolute right-3 top-3 flex h-8 items-center gap-1.5 rounded-md bg-muted px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            >
-              {copiedField === "text" ? (
-                <>
-                  <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5" />
-                  Copy
-                </>
-              )}
-            </button>
+            <div className="absolute right-3 top-3 flex gap-1.5">
+              <button
+                onClick={() => handleCopy(doc.text, "text")}
+                className="flex h-8 items-center gap-1.5 rounded-md bg-muted px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                {copiedField === "text" ? (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" />
+                    Copy
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => handleDownload(doc.text, `${doc.fileName.replace(/\.[^.]+$/, '')}.txt`, 'text/plain')}
+                className="flex h-8 items-center gap-1.5 rounded-md bg-muted px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </button>
+            </div>
             <div className="overflow-x-auto rounded-lg border border-border bg-card p-4 text-sm leading-relaxed text-foreground whitespace-pre-wrap">
               {doc.text || 'No plain text content available'}
             </div>
@@ -297,22 +335,30 @@ export function DocumentView({ documentId, onNavigate, activeProject, onGoToProj
         {/* JSON view */}
         <TabsContent value="json" className="mt-0">
           <div className="relative">
-            <button
-              onClick={() => handleCopy(jsonContent, "json")}
-              className="absolute right-3 top-3 flex h-8 items-center gap-1.5 rounded-md bg-muted px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            >
-              {copiedField === "json" ? (
-                <>
-                  <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5" />
-                  Copy
-                </>
-              )}
-            </button>
+            <div className="absolute right-3 top-3 flex gap-1.5">
+              <button
+                onClick={() => handleCopy(jsonContent, "json")}
+                className="flex h-8 items-center gap-1.5 rounded-md bg-muted px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                {copiedField === "json" ? (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5" />
+                    Copy
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => handleDownload(jsonContent, `${doc.fileName.replace(/\.[^.]+$/, '')}.json`, 'application/json')}
+                className="flex h-8 items-center gap-1.5 rounded-md bg-muted px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </button>
+            </div>
             <pre className="overflow-x-auto rounded-lg border border-border bg-card p-4 font-mono text-xs leading-relaxed text-foreground">
               {jsonContent}
             </pre>

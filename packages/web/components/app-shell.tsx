@@ -1,12 +1,14 @@
 "use client"
 
 import { useState } from "react"
+import { useTheme } from "next-themes"
 import {
   Search,
   FileText,
   LayoutDashboard,
   Upload,
-  Settings,
+  Sun,
+  Moon,
   ChevronDown,
   FolderOpen,
   Check,
@@ -41,6 +43,11 @@ export function AppShell({
   onGoToProjects,
 }: AppShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const { theme, setTheme } = useTheme()
+
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark')
+  }
 
   const navItems = [
     { id: "dashboard" as View, label: "Dashboard", icon: LayoutDashboard },
@@ -149,8 +156,13 @@ export function AppShell({
             <FolderOpen className="h-4 w-4" />
             <span className="font-medium">Projects</span>
           </button>
-          <button className="hidden h-9 items-center gap-1 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:flex">
-            <Settings className="h-4 w-4" />
+          <button
+            onClick={toggleTheme}
+            className="hidden h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:flex"
+            aria-label="Toggle theme"
+          >
+            <Sun className="h-4 w-4 rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
           </button>
           {/* Mobile nav toggle */}
           <button
