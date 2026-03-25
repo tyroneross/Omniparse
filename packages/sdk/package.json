@@ -59,7 +59,7 @@
     "url": "https://github.com/tyroneross/Omniparse/issues"
   },
   "dependencies": {
-    "p-limit": "^6.2.0",
+    "p-limit": "^7.3.0",
     "sax": "^1.4.1",
     "xlsx": "^0.18.5"
   },
