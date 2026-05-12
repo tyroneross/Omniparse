@@ -48,7 +48,7 @@
     "content-extraction"
   ],
   "author": "Tyrone Ross",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/tyroneross/Omniparse.git",
