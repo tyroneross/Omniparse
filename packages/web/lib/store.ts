@@ -1,9 +1,5 @@
-/**
- * Prisma-backed store for projects and parsed documents.
- * Replaces the previous in-memory Map store with SQLite persistence.
- */
-
-import { prisma } from './db'
+import { randomUUID } from 'crypto'
+import { getDb } from './db'
 
 export interface StoredProject {
   id: string
@@ -41,38 +37,29 @@ export interface StoredDocument {
 }
 
 const PROJECT_COLORS = [
-  "bg-primary",
-  "bg-chart-2",
-  "bg-chart-3",
-  "bg-chart-4",
-  "bg-chart-5",
+  'bg-primary',
+  'bg-chart-2',
+  'bg-chart-3',
+  'bg-chart-4',
+  'bg-chart-5',
 ]
 
-function toStoredProject(p: {
+type ProjectRow = {
   id: string
   name: string
   description: string
   color: string
-  createdAt: Date
-  updatedAt: Date
-}): StoredProject {
-  return {
-    id: p.id,
-    name: p.name,
-    description: p.description,
-    color: p.color,
-    createdAt: p.createdAt.toISOString(),
-    updatedAt: p.updatedAt.toISOString(),
-  }
+  createdAt: string
+  updatedAt: string
 }
 
-function toStoredDocument(d: {
+type DocumentRow = {
   id: string
   projectId: string
   fileName: string
   fileType: string
   fileSize: number
-  parsedAt: Date
+  parsedAt: string
   parseTime: number
   wordCount: number
   estimatedTokens: number
@@ -86,98 +73,110 @@ function toStoredDocument(d: {
   classes: number | null
   rawResult: string
   sheets: string | null
-}): StoredDocument {
-  return {
-    id: d.id,
-    projectId: d.projectId,
-    fileName: d.fileName,
-    fileType: d.fileType,
-    fileSize: d.fileSize,
-    parsedAt: d.parsedAt.toISOString(),
-    parseTime: d.parseTime,
-    wordCount: d.wordCount,
-    estimatedTokens: d.estimatedTokens,
-    markdown: d.markdown,
-    text: d.text,
-    sheetCount: d.sheetCount ?? undefined,
-    totalRows: d.totalRows ?? undefined,
-    slideCount: d.slideCount ?? undefined,
-    pageCount: d.pageCount ?? undefined,
-    functions: d.functions ?? undefined,
-    classes: d.classes ?? undefined,
-    rawResult: JSON.parse(d.rawResult),
-    sheets: d.sheets ? JSON.parse(d.sheets) : undefined,
-  }
 }
 
-// --- Color assignment ---
-
-let colorIndex: number | null = null
-
-async function nextColor(): Promise<string> {
-  if (colorIndex === null) {
-    const count = await prisma.project.count()
-    colorIndex = count
-  }
-  const color = PROJECT_COLORS[colorIndex! % PROJECT_COLORS.length]
-  colorIndex!++
-  return color
-}
-
-// --- Projects ---
-
-export async function createProject(name: string, description: string = ''): Promise<StoredProject> {
-  const color = await nextColor()
-  const project = await prisma.project.create({
-    data: { name, description, color },
-  })
-  return toStoredProject(project)
-}
-
-export async function getProject(id: string): Promise<StoredProject | undefined> {
-  const project = await prisma.project.findUnique({ where: { id } })
-  return project ? toStoredProject(project) : undefined
-}
-
-export async function getAllProjects(): Promise<StoredProject[]> {
-  const projects = await prisma.project.findMany({ orderBy: { createdAt: 'desc' } })
-  return projects.map(toStoredProject)
-}
-
-export async function deleteProject(id: string): Promise<boolean> {
-  try {
-    await prisma.project.delete({ where: { id } })
-    return true
-  } catch {
-    return false
-  }
-}
-
-export async function updateProject(
-  id: string,
-  updates: Partial<Pick<StoredProject, 'name' | 'description'>>
-): Promise<StoredProject | undefined> {
-  try {
-    const data: Record<string, string> = {}
-    if (updates.name) data.name = updates.name
-    if (updates.description !== undefined) data.description = updates.description
-    const project = await prisma.project.update({ where: { id }, data })
-    return toStoredProject(project)
-  } catch {
-    return undefined
-  }
-}
-
-// --- Documents ---
-
-export async function addDocument(doc: Omit<StoredDocument, 'id'>): Promise<StoredDocument> {
-  const created = await prisma.document.create({
-    data: {
+function createStatements() {
+  const db = getDb()
+  const countProjectsStatement = db.prepare('SELECT COUNT(*) AS count FROM "Project"')
+  const createProjectStatement = db.prepare(`
+    INSERT INTO "Project" ("id", "name", "description", "color", "createdAt", "updatedAt")
+    VALUES (@id, @name, @description, @color, @createdAt, @updatedAt)
+  `)
+  const getProjectStatement = db.prepare('SELECT * FROM "Project" WHERE "id" = ?')
+  const getAllProjectsStatement = db.prepare('SELECT * FROM "Project" ORDER BY datetime("createdAt") DESC')
+  const deleteProjectStatement = db.prepare('DELETE FROM "Project" WHERE "id" = ?')
+  const updateProjectStatement = db.prepare(`
+    UPDATE "Project"
+    SET "name" = @name,
+        "description" = @description,
+        "updatedAt" = @updatedAt
+    WHERE "id" = @id
+  `)
+  const createDocumentStatement = db.prepare(`
+    INSERT INTO "Document" (
+      "id",
+      "projectId",
+      "fileName",
+      "fileType",
+      "fileSize",
+      "parsedAt",
+      "parseTime",
+      "wordCount",
+      "estimatedTokens",
+      "markdown",
+      "text",
+      "sheetCount",
+      "totalRows",
+      "slideCount",
+      "pageCount",
+      "functions",
+      "classes",
+      "rawResult",
+      "sheets"
+    )
+    VALUES (
+      @id,
+      @projectId,
+      @fileName,
+      @fileType,
+      @fileSize,
+      @parsedAt,
+      @parseTime,
+      @wordCount,
+      @estimatedTokens,
+      @markdown,
+      @text,
+      @sheetCount,
+      @totalRows,
+      @slideCount,
+      @pageCount,
+      @functions,
+      @classes,
+      @rawResult,
+      @sheets
+    )
+  `)
+  const getDocumentStatement = db.prepare('SELECT * FROM "Document" WHERE "id" = ?')
+  const getProjectDocumentsStatement = db.prepare(`
+    SELECT * FROM "Document"
+    WHERE "projectId" = ?
+    ORDER BY datetime("parsedAt") DESC
+  `)
+  const getAllDocumentsStatement = db.prepare('SELECT * FROM "Document" ORDER BY datetime("parsedAt") DESC')
+  const deleteDocumentStatement = db.prepare('DELETE FROM "Document" WHERE "id" = ?')
+  const searchDocumentsStatement = db.prepare(`
+    SELECT * FROM "Document"
+    WHERE "projectId" = @projectId
+      AND (
+        "text" LIKE @pattern ESCAPE '\\'
+        OR "markdown" LIKE @pattern ESCAPE '\\'
+        OR "fileName" LIKE @pattern ESCAPE '\\'
+      )
+  `)
+  const getProjectStatsStatement = db.prepare(`
+    SELECT
+      COUNT(*) AS "documentCount",
+      COALESCE(SUM("wordCount"), 0) AS "wordCount",
+      COALESCE(SUM("estimatedTokens"), 0) AS "tokenCount",
+      COUNT(DISTINCT "fileType") AS "sourceTypes"
+    FROM "Document"
+    WHERE "projectId" = ?
+  `)
+  const touchProjectStatement = db.prepare(`
+    UPDATE "Project"
+    SET "updatedAt" = ?
+    WHERE "id" = ?
+  `)
+  const insertDocumentTransaction = db.transaction((doc: Omit<StoredDocument, 'id'>) => {
+    const id = randomUUID()
+    const now = new Date().toISOString()
+    createDocumentStatement.run({
+      id,
       projectId: doc.projectId,
       fileName: doc.fileName,
       fileType: doc.fileType,
       fileSize: doc.fileSize,
-      parsedAt: new Date(doc.parsedAt),
+      parsedAt: doc.parsedAt,
       parseTime: doc.parseTime,
       wordCount: doc.wordCount,
       estimatedTokens: doc.estimatedTokens,
@@ -191,60 +190,212 @@ export async function addDocument(doc: Omit<StoredDocument, 'id'>): Promise<Stor
       classes: doc.classes ?? null,
       rawResult: JSON.stringify(doc.rawResult),
       sheets: doc.sheets ? JSON.stringify(doc.sheets) : null,
-    },
+    })
+    touchProjectStatement.run(now, doc.projectId)
+    return id
   })
 
-  // Touch the project's updatedAt
-  await prisma.project.update({
-    where: { id: doc.projectId },
-    data: { updatedAt: new Date() },
-  }).catch(() => {})
+  return {
+    countProjectsStatement,
+    createProjectStatement,
+    getProjectStatement,
+    getAllProjectsStatement,
+    deleteProjectStatement,
+    updateProjectStatement,
+    getDocumentStatement,
+    getProjectDocumentsStatement,
+    getAllDocumentsStatement,
+    deleteDocumentStatement,
+    searchDocumentsStatement,
+    getProjectStatsStatement,
+    insertDocumentTransaction,
+  }
+}
+
+let statements: ReturnType<typeof createStatements> | undefined
+
+function getStatements() {
+  if (!statements) {
+    statements = createStatements()
+  }
+  return statements
+}
+
+function toIsoString(value: string) {
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString()
+}
+
+function safeParseJson<T>(value: string | null | undefined, fallback: T): T {
+  if (!value) {
+    return fallback
+  }
+
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    return fallback
+  }
+}
+
+function escapeLike(value: string) {
+  return value.replace(/[\\%_]/g, '\\$&')
+}
+
+function toStoredProject(p: ProjectRow): StoredProject {
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    color: p.color,
+    createdAt: toIsoString(p.createdAt),
+    updatedAt: toIsoString(p.updatedAt),
+  }
+}
+
+function toStoredDocument(d: DocumentRow): StoredDocument {
+  return {
+    id: d.id,
+    projectId: d.projectId,
+    fileName: d.fileName,
+    fileType: d.fileType,
+    fileSize: d.fileSize,
+    parsedAt: toIsoString(d.parsedAt),
+    parseTime: d.parseTime,
+    wordCount: d.wordCount,
+    estimatedTokens: d.estimatedTokens,
+    markdown: d.markdown,
+    text: d.text,
+    sheetCount: d.sheetCount ?? undefined,
+    totalRows: d.totalRows ?? undefined,
+    slideCount: d.slideCount ?? undefined,
+    pageCount: d.pageCount ?? undefined,
+    functions: d.functions ?? undefined,
+    classes: d.classes ?? undefined,
+    rawResult: safeParseJson<Record<string, unknown>>(d.rawResult, {}),
+    sheets: safeParseJson<StoredDocument['sheets']>(d.sheets, undefined),
+  }
+}
+
+// --- Color assignment ---
+
+let colorIndex: number | null = null
+
+async function nextColor(): Promise<string> {
+  if (colorIndex === null) {
+    const { countProjectsStatement } = getStatements()
+    const row = countProjectsStatement.get() as { count: number }
+    colorIndex = row.count
+  }
+  const color = PROJECT_COLORS[colorIndex! % PROJECT_COLORS.length]
+  colorIndex!++
+  return color
+}
+
+// --- Projects ---
+
+export async function createProject(name: string, description: string = ''): Promise<StoredProject> {
+  const { createProjectStatement } = getStatements()
+  const color = await nextColor()
+  const now = new Date().toISOString()
+  const project: ProjectRow = {
+    id: randomUUID(),
+    name,
+    description,
+    color,
+    createdAt: now,
+    updatedAt: now,
+  }
+
+  createProjectStatement.run(project)
+
+  return toStoredProject(project)
+}
+
+export async function getProject(id: string): Promise<StoredProject | undefined> {
+  const { getProjectStatement } = getStatements()
+  const project = getProjectStatement.get(id) as ProjectRow | undefined
+  return project ? toStoredProject(project) : undefined
+}
+
+export async function getAllProjects(): Promise<StoredProject[]> {
+  const { getAllProjectsStatement } = getStatements()
+  const projects = getAllProjectsStatement.all() as ProjectRow[]
+  return projects.map(toStoredProject)
+}
+
+export async function deleteProject(id: string): Promise<boolean> {
+  const { deleteProjectStatement } = getStatements()
+  const result = deleteProjectStatement.run(id)
+  return result.changes > 0
+}
+
+export async function updateProject(
+  id: string,
+  updates: Partial<Pick<StoredProject, 'name' | 'description'>>
+): Promise<StoredProject | undefined> {
+  const { getProjectStatement, updateProjectStatement } = getStatements()
+  const existing = getProjectStatement.get(id) as ProjectRow | undefined
+  if (!existing) {
+    return undefined
+  }
+
+  const nextProject: ProjectRow = {
+    ...existing,
+    name: updates.name ?? existing.name,
+    description: updates.description ?? existing.description,
+    updatedAt: new Date().toISOString(),
+  }
+
+  updateProjectStatement.run(nextProject)
+  return toStoredProject(nextProject)
+}
+
+export async function addDocument(doc: Omit<StoredDocument, 'id'>): Promise<StoredDocument> {
+  const { getDocumentStatement, insertDocumentTransaction } = getStatements()
+  const id = insertDocumentTransaction(doc)
+  const created = getDocumentStatement.get(id) as DocumentRow | undefined
+
+  if (!created) {
+    throw new Error('Failed to persist parsed document')
+  }
 
   return toStoredDocument(created)
 }
 
 export async function getDocument(id: string): Promise<StoredDocument | undefined> {
-  const doc = await prisma.document.findUnique({ where: { id } })
+  const { getDocumentStatement } = getStatements()
+  const doc = getDocumentStatement.get(id) as DocumentRow | undefined
   return doc ? toStoredDocument(doc) : undefined
 }
 
 export async function getProjectDocuments(projectId: string): Promise<StoredDocument[]> {
-  const docs = await prisma.document.findMany({
-    where: { projectId },
-    orderBy: { parsedAt: 'desc' },
-  })
+  const { getProjectDocumentsStatement } = getStatements()
+  const docs = getProjectDocumentsStatement.all(projectId) as DocumentRow[]
   return docs.map(toStoredDocument)
 }
 
 export async function getAllDocuments(): Promise<StoredDocument[]> {
-  const docs = await prisma.document.findMany({ orderBy: { parsedAt: 'desc' } })
+  const { getAllDocumentsStatement } = getStatements()
+  const docs = getAllDocumentsStatement.all() as DocumentRow[]
   return docs.map(toStoredDocument)
 }
 
 export async function deleteDocument(id: string): Promise<boolean> {
-  try {
-    await prisma.document.delete({ where: { id } })
-    return true
-  } catch {
-    return false
-  }
+  const { deleteDocumentStatement } = getStatements()
+  const result = deleteDocumentStatement.run(id)
+  return result.changes > 0
 }
 
 export async function searchDocuments(
   projectId: string,
   query: string
 ): Promise<Array<StoredDocument & { matchCount: number; relevance: number; excerpt: string }>> {
-  // Fetch matching documents using SQLite LIKE
-  const docs = await prisma.document.findMany({
-    where: {
-      projectId,
-      OR: [
-        { text: { contains: query } },
-        { markdown: { contains: query } },
-        { fileName: { contains: query } },
-      ],
-    },
-  })
+  const { searchDocumentsStatement } = getStatements()
+  const docs = searchDocumentsStatement.all({
+    projectId,
+    pattern: `%${escapeLike(query)}%`,
+  }) as DocumentRow[]
 
   const lowerQuery = query.toLowerCase()
 
@@ -295,19 +446,11 @@ export async function searchDocuments(
 }
 
 export async function getProjectStats(projectId: string) {
-  const docs = await prisma.document.findMany({
-    where: { projectId },
-    select: {
-      wordCount: true,
-      estimatedTokens: true,
-      fileType: true,
-    },
-  })
-
-  return {
-    documentCount: docs.length,
-    wordCount: docs.reduce((a, d) => a + d.wordCount, 0),
-    tokenCount: docs.reduce((a, d) => a + d.estimatedTokens, 0),
-    sourceTypes: new Set(docs.map(d => d.fileType)).size,
+  const { getProjectStatsStatement } = getStatements()
+  return getProjectStatsStatement.get(projectId) as {
+    documentCount: number
+    wordCount: number
+    tokenCount: number
+    sourceTypes: number
   }
 }

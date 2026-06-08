@@ -7,13 +7,14 @@
   "scripts": {
     "build": "npm -w packages/sdk run build",
     "build:web": "npm -w packages/sdk run build && npm -w packages/web run build",
-    "dev": "npm -w packages/sdk run build && npm -w packages/web run dev",
+    "dev": "npm -w packages/sdk run build && npm -w packages/web run dev --",
     "dev:sdk": "npm -w packages/sdk run dev",
     "test": "npm -w packages/sdk run test",
-    "clean": "npm -w packages/sdk run clean",
-    "typecheck": "npm -w packages/sdk run typecheck",
-    "db:generate": "npm -w packages/web exec prisma generate",
-    "db:push": "npm -w packages/web exec prisma db push"
+    "clean": "npm -w packages/sdk run clean && rm -rf packages/web/.next",
+    "typecheck": "npm -w packages/sdk run typecheck"
+  },
+  "devDependencies": {
+    "xlsx": "file:vendor/xlsx-0.20.3.tgz"
   },
   "engines": {
     "node": ">=18.0.0"

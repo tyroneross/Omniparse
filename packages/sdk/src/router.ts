@@ -67,6 +67,11 @@ export interface OmniparseOptions {
   recursive?: boolean;
   /** Concurrency for parallel document parsing in directories (default: 4) */
   concurrency?: number;
+  /**
+   * For Excel: include normalized sheet rows in metadata.
+   * Disabled by default because large workbooks can produce large payloads.
+   */
+  includeSheetRows?: boolean;
   /** Progress callback for batch/directory operations */
   onProgress?: (completed: number, total: number) => void;
   /** Suppress console output */
@@ -263,6 +268,9 @@ async function parseExcel(filePath: string, options: OmniparseOptions): Promise<
       headers: s.headers,
       rowCount: s.rowCount,
       columnCount: s.columnCount,
+      rows: options.includeSheetRows
+        ? s.rawData.slice(1).map(row => row.map(cell => String(cell ?? '')))
+        : undefined,
     })),
     properties: result.properties,
   };
@@ -334,6 +342,9 @@ async function parsePptx(filePath: string, options: OmniparseOptions): Promise<P
       slides: result.slides.map(s => ({
         slideNumber: s.slideNumber,
         title: s.title,
+        text: s.text,
+        textBlocks: s.textBlocks,
+        notes: s.notes,
         hasNotes: !!s.notes,
       })),
     },

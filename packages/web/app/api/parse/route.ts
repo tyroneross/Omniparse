@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { writeFile, unlink, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { parse, detectInputType, parseExcelFile } from '@tyroneross/omniparse'
+import { parse, detectInputType } from '@tyroneross/omniparse'
 import { getProject, addDocument } from '@/lib/store'
 
 export async function POST(request: NextRequest) {
@@ -39,23 +39,21 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer()
     await writeFile(tempPath, Buffer.from(bytes))
 
-    // Parse with SDK
-    const result = await parse(tempPath) as Record<string, any>
+    // Parse with SDK. Excel uploads opt into sheet rows so the UI does not
+    // need to re-parse the workbook just to render tabular data.
+    const result = await parse(tempPath, {
+      includeSheetRows: inputType === 'excel',
+    }) as Record<string, any>
 
-    // For Excel files, also get sheet data with row content
-    let sheets: Array<{ name: string; headers: string[]; rows: string[][] }> | undefined
-    if (inputType === 'excel') {
-      try {
-        const excelResult = parseExcelFile(tempPath)
-        sheets = excelResult.sheets.map(sheet => ({
-          name: sheet.name,
-          headers: sheet.headers,
-          rows: sheet.rawData.slice(1).map(row => row.map(cell => String(cell ?? ''))),
-        }))
-      } catch {
-        // Fall back to metadata-only sheets
-      }
-    }
+    const sheets = inputType === 'excel'
+      ? (result.metadata?.sheets ?? [])
+          .filter((sheet: any) => sheet && typeof sheet.name === 'string')
+          .map((sheet: any) => ({
+            name: sheet.name,
+            headers: Array.isArray(sheet.headers) ? sheet.headers : [],
+            rows: Array.isArray(sheet.rows) ? sheet.rows : [],
+          }))
+      : undefined
 
     const doc = await addDocument({
       projectId,

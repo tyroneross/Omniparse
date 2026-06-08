@@ -189,8 +189,9 @@ export function parseExcelFile(
     throw new Error(`File too large: ${(stat.size / 1024 / 1024).toFixed(1)}MB exceeds ${(maxFileSize / 1024 / 1024).toFixed(0)}MB limit`);
   }
 
-  const workbook = XLSX.readFile(filePath, {
-    type: 'file',
+  const fileBuffer = fs.readFileSync(filePath);
+  const workbook = XLSX.read(fileBuffer, {
+    type: 'buffer',
     cellDates: true,
     cellNF: true,
     cellStyles: false,
@@ -200,11 +201,7 @@ export function parseExcelFile(
   const fileName = path.basename(filePath);
   const format = detectFormat(filePath);
 
-  // For full mode on XLSX files, read the raw buffer for ZIP extraction
-  let rawBuffer: Buffer | undefined;
-  if (parseMode === 'full' && format === 'xlsx') {
-    rawBuffer = fs.readFileSync(filePath);
-  }
+  const rawBuffer = parseMode === 'full' && format === 'xlsx' ? fileBuffer : undefined;
 
   return processWorkbook(workbook, fileName, format, options, startTime, rawBuffer);
 }

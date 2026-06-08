@@ -7,8 +7,41 @@ Universal document parser. Parse Excel, PowerPoint, Python, PDF, and directories
 | Package | Description | Status |
 |---------|-------------|--------|
 | [`@tyroneross/omniparse`](./packages/sdk) | Core SDK / NPM package | Active |
-| [`@tyroneross/omniparse-web`](./packages/web) | Web application | Planned |
-| [`@tyroneross/omniparse-mac`](./packages/mac) | Mac desktop application | Planned |
+| [`@tyroneross/omniparse-web`](./packages/web) | Local web application for projects, uploads, and search | Active |
+
+## Repo Shape
+
+Keep this repo mentally small:
+
+- `packages/sdk` — required; this is the parser product
+- `packages/web` — optional app shell built on top of the SDK
+- `packages/sdk/src/parsers` — required parser implementations
+- `packages/sdk/tests` — required parser verification
+- `packages/web/app`, `packages/web/components`, `packages/web/lib` — required for the web app
+- `packages/web/data` — local SQLite storage created on demand for the web app
+
+Generated local folders are not part of the architecture:
+
+- `node_modules/`
+- `packages/sdk/dist/`
+- `packages/web/.next/`
+- `packages/web/data/omniparse.db`
+- `packages/web/data/omniparse.db-shm`
+- `packages/web/data/omniparse.db-wal`
+
+Legacy note: if an older `packages/web/prisma/omniparse.db` exists, the web app copies it forward to `packages/web/data/omniparse.db` automatically.
+
+If you want the leanest working repo, focus on `packages/sdk` first and treat `packages/web` as a separate consumer of the SDK.
+
+## Development
+
+For the web app, use the workspace script:
+
+```bash
+npm run dev
+```
+
+The web package runs Next.js in webpack mode with `WATCHPACK_POLLING=true`. In this repo shape, polling avoids the Watchpack `EMFILE` failure that can prevent dev routes from registering even though production builds still pass.
 
 ## Quick Start
 

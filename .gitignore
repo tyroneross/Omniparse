@@ -11,10 +11,12 @@ out/
 
 # SQLite database
 *.db
+*.db-shm
+*.db-wal
 *.db-journal
-
-# Generated Prisma client
-generated/
 
 # Bookmark snapshot data
 .claude/bookmarks/
+.bookmark/
+.claude-code-debugger/
+.archive/

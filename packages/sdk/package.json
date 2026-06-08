@@ -1,7 +1,7 @@
 {
   "name": "@tyroneross/omniparse",
   "version": "1.0.0",
-  "description": "Universal document parser. Parse Excel, PowerPoint, Python, PDF, and directories into clean, LLM-ready Markdown and structured data.",
+  "description": "Universal document parser SDK for Excel, PowerPoint, Python, PDF, and directories; outputs Markdown and structured metadata for LLM workflows.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -47,7 +47,7 @@
     "file-parser",
     "content-extraction"
   ],
-  "author": "Tyrone Ross",
+  "author": "Tyrone Ross, Jr <46267523+tyroneross@users.noreply.github.com>",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -60,8 +60,7 @@
   },
   "dependencies": {
     "p-limit": "^7.3.0",
-    "sax": "^1.4.1",
-    "xlsx": "^0.18.5"
+    "sax": "^1.4.1"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -72,5 +71,9 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }

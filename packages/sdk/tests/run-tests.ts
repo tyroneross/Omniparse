@@ -61,6 +61,24 @@ async function testExcelParser() {
   assert(result.parseTime >= 0, `Parsed in ${result.parseTime}ms`);
 }
 
+async function testExcelFullMode() {
+  console.log('\n--- Excel Full Mode Tests ---');
+  const { parseExcelFile } = await import('../src/parsers/excel-parser-fast');
+
+  const richFile = path.join(FIXTURES_DIR, 'rich-fixture.xlsx');
+  if (!fs.existsSync(richFile)) {
+    console.log('  SKIP: rich-fixture.xlsx not found in fixtures');
+    return;
+  }
+
+  const result = parseExcelFile(richFile, { parseMode: 'full' });
+  assert(result.parseMode === 'full', 'Parsed workbook in full mode');
+  assert(!!result.richContent, 'Extracted rich content');
+  assert((result.richContent?.comments.length ?? 0) > 0, 'Extracted workbook comments');
+  assert((result.richContent?.mergedCells.length ?? 0) > 0, 'Extracted merged cells');
+  assert(!!result.structureSummary?.hasRichContent, 'Generated rich structure summary');
+}
+
 async function testPptxParser() {
   console.log('\n--- PPTX Parser Tests ---');
   const { parsePptxFile } = await import('../src/parsers/pptx-parser-fast');
@@ -73,11 +91,17 @@ async function testPptxParser() {
 
   const result = await parsePptxFile(pptxFile);
   assert(result.fileName === 'sample.pptx', 'File name is correct');
-  assert(result.slideCount > 0, `Has ${result.slideCount} slide(s)`);
+  assert(result.slideCount === 10, 'Has expected slide count');
+  assert((result.slides[0]?.title?.length ?? 0) > 0, 'Detected first slide title');
+  assert(result.slides.some(slide => !!slide.notes), 'Extracted speaker notes');
   assert(result.markdown.length > 0, 'Generated markdown');
+  assert(result.markdown.includes('## Slide 1'), 'Generated markdown slide headers');
   assert(result.text.length > 0, 'Generated text');
   assert(result.estimatedTokens > 0, `Estimated ${result.estimatedTokens} tokens`);
   assert(result.parseTime >= 0, `Parsed in ${result.parseTime}ms`);
+
+  const noNotesResult = await parsePptxFile(pptxFile, { includeNotes: false });
+  assert(noNotesResult.slides.every(slide => !slide.notes), 'Can disable speaker notes');
 }
 
 async function testPythonParser() {
@@ -120,6 +144,24 @@ class Person:
   assert(result.estimatedTokens > 0, `Estimated ${result.estimatedTokens} tokens`);
 }
 
+async function testPythonFixtureParser() {
+  console.log('\n--- Python Fixture Tests ---');
+  const { parsePythonFile } = await import('../src/parsers/python-parser');
+
+  const pyFile = path.join(FIXTURES_DIR, 'sample.py');
+  if (!fs.existsSync(pyFile)) {
+    console.log('  SKIP: sample.py not found in fixtures');
+    return;
+  }
+
+  const result = parsePythonFile(pyFile);
+  assert(result.moduleDocstring?.includes('Sample Python Module') === true, 'Fixture module docstring extracted');
+  assert(result.imports.length === 5, 'Fixture import count is stable');
+  assert(result.variables.some(variable => variable.name === 'MAX_RETRIES'), 'Extracted MAX_RETRIES constant');
+  assert(result.functions.some(fn => fn.name === 'load_data'), 'Extracted load_data function');
+  assert(result.classes.some(cls => cls.name === 'DataProcessor'), 'Extracted DataProcessor class');
+}
+
 async function testParseUnified() {
   console.log('\n--- Unified Parse Tests ---');
   const { parse } = await import('../src/router');
@@ -130,6 +172,14 @@ async function testParseUnified() {
     const result = await parse(pyFile) as any;
     assert(result.inputType === 'python', 'Routed to python parser');
     assert(result.markdown.length > 0, 'Generated markdown via router');
+  }
+
+  const pptxFile = path.join(FIXTURES_DIR, 'sample.pptx');
+  if (fs.existsSync(pptxFile)) {
+    const result = await parse(pptxFile) as any;
+    assert(result.inputType === 'pptx', 'Routed to pptx parser');
+    assert(result.metadata.slides.some((slide: any) => String(slide.text ?? '').length > 0), 'Router preserves slide text metadata');
+    assert(result.metadata.slides.some((slide: any) => String(slide.notes ?? '').length > 0), 'Router preserves speaker notes metadata');
   }
 
   // Test unsupported input
@@ -147,8 +197,10 @@ async function main() {
 
   await testRouter();
   await testExcelParser();
+  await testExcelFullMode();
   await testPptxParser();
   await testPythonParser();
+  await testPythonFixtureParser();
   await testParseUnified();
 
   console.log(`\n===================`);

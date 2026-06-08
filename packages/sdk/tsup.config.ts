@@ -12,7 +12,7 @@ export default defineConfig({
   sourcemap: true,
   splitting: false,
   target: 'node18',
-  external: ['xlsx', 'sax'],
+  external: ['sax'],
   banner: ({ format }) => {
     if (format === 'cjs') {
       return {};
