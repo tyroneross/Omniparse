@@ -191,6 +191,36 @@ async function testParseUnified() {
   }
 }
 
+async function testCli() {
+  console.log('\n--- CLI Tests ---');
+  const { spawnSync } = await import('child_process');
+  const { detectInputType } = await import('../src/router');
+
+  const tsxCli = require.resolve('tsx/cli');
+  const binPath = path.join(__dirname, '..', 'bin', 'omniparse.ts');
+  const runCli = (...cliArgs: string[]) =>
+    spawnSync(process.execPath, [tsxCli, binPath, ...cliArgs], { encoding: 'utf-8' });
+
+  const pyFile = path.join(FIXTURES_DIR, 'sample.py');
+  if (fs.existsSync(pyFile)) {
+    const run = runCli(pyFile, '-f', 'json', '-q');
+    assert(run.status === 0, 'CLI exits 0 for a supported file');
+    const json = JSON.parse(run.stdout);
+    assert(json.inputType === detectInputType(pyFile), 'CLI JSON inputType matches router detectInputType');
+    assert(typeof json.metadata === 'object' && json.metadata !== null, 'CLI JSON carries router metadata (ParseResult shape)');
+    assert(json.markdown.length > 0, 'CLI JSON carries markdown');
+  }
+
+  const unsupported = runCli(path.join(__dirname, 'run-tests.ts'), '-q');
+  assert(unsupported.status === 1, 'CLI exits 1 for an unsupported file type');
+  assert(unsupported.stderr.includes('Unsupported'), 'CLI reports unsupported file type');
+
+  const dirRun = runCli(FIXTURES_DIR, '-f', 'json', '-q');
+  assert(dirRun.status === 0, 'CLI exits 0 for a directory');
+  const dirJson = JSON.parse(dirRun.stdout);
+  assert(Array.isArray(dirJson) && dirJson.length > 1, `CLI parsed ${Array.isArray(dirJson) ? dirJson.length : 0} files from fixtures dir`);
+}
+
 async function main() {
   console.log('Omniparse SDK Tests');
   console.log('===================');
@@ -202,6 +232,7 @@ async function main() {
   await testPythonParser();
   await testPythonFixtureParser();
   await testParseUnified();
+  await testCli();
 
   console.log(`\n===================`);
   console.log(`Results: ${passed} passed, ${failed} failed`);
