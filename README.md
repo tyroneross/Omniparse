@@ -115,4 +115,4 @@ const py = parsePythonFile('./script.py');
 
 ## License
 
-MIT
+Apache-2.0 — see [LICENSE](./LICENSE).
